@@ -192,6 +192,7 @@ def create_returns_tear_sheet(factor_data,
         If True, display graphs separately for each group.
     """
 
+
     factor_returns = perf.factor_returns(factor_data,
                                          long_short,
                                          group_neutral)
@@ -258,27 +259,27 @@ def create_returns_tear_sheet(factor_data,
             UserWarning
         )
 
-    for p in factor_returns:
-
+    # Compute cumulative returns from daily simple returns, if '1D'
+    # returns are provided.
+    if '1D' in factor_returns:
         title = ('Factor Weighted '
                  + ('Group Neutral ' if group_neutral else '')
                  + ('Long/Short ' if long_short else '')
-                 + "Portfolio Cumulative Return ({} Period)".format(p))
+                 + 'Portfolio Cumulative Return (1D Period)')
 
         plotting.plot_cumulative_returns(
-            factor_returns[p],
-            period=p,
-            freq=trading_calendar,
+            factor_returns['1D'],
+            period='1D',
             title=title,
             ax=gf.next_row()
         )
 
         plotting.plot_cumulative_returns_by_quantile(
-            mean_quant_ret_bydate[p],
-            period=p,
-            freq=trading_calendar,
+            mean_quant_ret_bydate['1D'],
+            period='1D',
             ax=gf.next_row()
         )
+
 
     ax_mean_quantile_returns_spread_ts = [gf.next_row()
                                           for x in range(fr_cols)]
@@ -405,8 +406,15 @@ def create_turnover_tear_sheet(factor_data, turnover_periods=None):
     """
 
     if turnover_periods is None:
-        turnover_periods = utils.get_forward_returns_columns(
-            factor_data.columns)
+        input_periods = utils.get_forward_returns_columns(
+            factor_data.columns,
+            require_exact_day_multiple=True,
+        )
+        turnover_periods = list(
+            map(
+                (lambda x: pd.Timedelta(x).days), input_periods.get_values()
+            )
+        )
 
     quantile_factor = factor_data['factor_quantile']
 
@@ -482,6 +490,7 @@ def create_full_tear_sheet(factor_data,
         If True, display graphs separately for each group.
     """
 
+
     plotting.plot_quantile_statistics_table(factor_data)
     create_returns_tear_sheet(factor_data,
                               long_short,
@@ -497,7 +506,7 @@ def create_full_tear_sheet(factor_data,
 
 @plotting.customize
 def create_event_returns_tear_sheet(factor_data,
-                                    prices,
+                                    returns,
                                     avgretplot=(5, 15),
                                     long_short=True,
                                     group_neutral=False,
@@ -538,7 +547,7 @@ def create_event_returns_tear_sheet(factor_data,
     avg_cumulative_returns = \
         perf.average_cumulative_return_by_quantile(
             factor_data,
-            prices,
+            returns,
             periods_before=before,
             periods_after=after,
             demeaned=long_short,
@@ -576,7 +585,7 @@ def create_event_returns_tear_sheet(factor_data,
         avg_cumret_by_group = \
             perf.average_cumulative_return_by_quantile(
                 factor_data,
-                prices,
+                returns,
                 periods_before=before,
                 periods_after=after,
                 demeaned=long_short,
@@ -598,7 +607,7 @@ def create_event_returns_tear_sheet(factor_data,
 
 @plotting.customize
 def create_event_study_tear_sheet(factor_data,
-                                  prices=None,
+                                  returns,
                                   avgretplot=(5, 15),
                                   rate_of_ret=True,
                                   n_bars=50):
@@ -638,10 +647,10 @@ def create_event_study_tear_sheet(factor_data,
     plt.show()
     gf.close()
 
-    if prices is not None and avgretplot is not None:
+    if returns is not None and avgretplot is not None:
 
         create_event_returns_tear_sheet(factor_data=factor_data,
-                                        prices=prices,
+                                        returns=returns,
                                         avgretplot=avgretplot,
                                         long_short=long_short,
                                         group_neutral=False,
@@ -649,8 +658,8 @@ def create_event_study_tear_sheet(factor_data,
                                         by_group=False)
 
     factor_returns = perf.factor_returns(factor_data,
-                                         demeaned=False,
-                                         equal_weight=True)
+                                     demeaned=False,
+                                     equal_weight=True)
 
     mean_quant_ret, std_quantile = \
         perf.mean_return_by_quantile(factor_data,
@@ -674,7 +683,7 @@ def create_event_study_tear_sheet(factor_data,
 
     fr_cols = len(factor_returns.columns)
     vertical_sections = 2 + fr_cols * 1
-    gf = GridFigure(rows=vertical_sections, cols=1)
+    gf = GridFigure(rows=vertical_sections + 1, cols=1)
 
     plotting.plot_quantile_returns_bar(mean_quant_ret,
                                        by_group=False,
@@ -693,13 +702,20 @@ def create_event_study_tear_sheet(factor_data,
             UserWarning
         )
 
-    for p in factor_returns:
+
+    if '1D' in factor_returns:
+        plotting.plot_cumulative_returns(
+            factor_returns['1D'],
+            period='1D',
+            freq=trading_calendar,
+            ax=gf.next_row(),
+        )
 
         plotting.plot_cumulative_returns(
-            factor_returns[p],
-            period=p,
+            factor_returns['1D'],
+            period='1D',
             freq=trading_calendar,
-            ax=gf.next_row()
+            ax=gf.next_row(),
         )
 
     plt.show()
